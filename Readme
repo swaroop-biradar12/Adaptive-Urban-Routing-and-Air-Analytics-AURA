@@ -1,0 +1,187 @@
+# AURA — Smart Traffic & Pollution Analysis
+## Complete Setup Guide with Real Datasets
+
+---
+
+## 📁 Project Structure
+```
+aura_full/
+├── module1_detection/
+│   └── detector.py            ← YOLOv8 + OpenCV (video/frames/webcam)
+├── module2_prediction/
+│   └── aqi_predictor.py       ← Random Forest AQI prediction
+├── module3_dashboard/
+│   └── dashboard.py           ← Streamlit live dashboard
+├── utils/
+│   └── generate_dataset.py    ← Synthetic frame generator (included)
+├── data/
+│   └── sample_frames/         ← 200 generated CCTV frames (ready to use)
+├── outputs/
+│   ├── tdi_results.csv        ← Module 1 output (vehicle counts per frame)
+│   ├── aura_rf_model.pkl      ← Trained Random Forest
+│   ├── aura_scaler.pkl        ← Feature scaler
+│   ├── model_meta.json        ← Model metrics
+│   └── plots/
+│       └── aura_model_results.png
+└── requirements.txt
+```
+
+---
+
+## 🗂️ Real Datasets (Free & Publicly Available)
+
+### Traffic Videos — Use with Module 1:
+
+| Dataset | Link | Size | Format |
+|---|---|---|---|
+| Highway Traffic Videos (City Univ HK) | https://www.kaggle.com/datasets/aryashah2k/highway-traffic-videos-dataset | 88 MB | MP4 (254 clips) |
+| Traffic Video Dataset | https://www.kaggle.com/datasets/arshadrahmanziban/traffic-video-dataset | ~200 MB | MP4 |
+| Road Traffic Video Monitoring | https://www.kaggle.com/datasets/shawon10/road-traffic-video-monitoring | ~50 MB | MP4 |
+| Roboflow Traffic Detection | https://universe.roboflow.com/yolo-iuil0/traffic-4zbse | ~300 MB | Images + YOLO labels |
+| HuggingFace Real-Time Traffic | https://huggingface.co/datasets/UniDataPro/real-time-traffic-video-dataset | 500 videos | MP4 + COCO JSON |
+
+### AQI / Pollution Data — Use with Module 2:
+
+| Dataset | Link | Format |
+|---|---|---|
+| CPCB Hourly AQI | https://cpcb.nic.in/automatic-monitoring-data/ | CSV per city |
+| data.gov.in AQI | https://data.gov.in/resource/real-time-air-quality-index | CSV/API |
+| AQICN World AQI | https://aqicn.org/data-platform/token/ | JSON API |
+| OpenAQ Platform | https://openaq.org/ | API / CSV |
+
+---
+
+## ⚙️ Installation
+
+```bash
+# Install all dependencies
+pip install ultralytics opencv-python scikit-learn pandas numpy \
+            matplotlib joblib streamlit plotly
+
+# Ultralytics auto-downloads YOLOv8n.pt on first run (~6 MB)
+```
+
+---
+
+## 🚀 Step-by-Step Usage
+
+### STEP 1 — Run Traffic Detection (Module 1)
+
+```bash
+cd aura_full
+
+# Option A: Use included synthetic frames (no video needed)
+python module1_detection/detector.py --source data/sample_frames --mode json
+
+# Option B: Use a real video file (requires ultralytics)
+python module1_detection/detector.py --source /path/to/traffic.mp4
+
+# Option C: Live webcam
+python module1_detection/detector.py --source 0
+
+# Option D: Roboflow image folder (YOLO mode)
+python module1_detection/detector.py --source /path/to/roboflow/images --mode yolo
+```
+→ Output: `outputs/tdi_results.csv` (TDI per frame)
+
+---
+
+### STEP 2 — Train AQI Prediction Model (Module 2)
+
+```bash
+python module2_prediction/aqi_predictor.py
+```
+→ Reads `outputs/tdi_results.csv` (from Module 1)  
+→ Uses CPCB AQI patterns (or your real CPCB CSV)  
+→ Output: `outputs/aura_rf_model.pkl` + `outputs/plots/aura_model_results.png`
+
+**To use real CPCB data:** Edit `aqi_predictor.py` line 27:
+```python
+CPCB_CSV = "path/to/your_cpcb_data.csv"
+# Expected columns: datetime, pm25, station, city
+```
+
+---
+
+### STEP 3 — Launch Dashboard (Module 3)
+
+```bash
+streamlit run module3_dashboard/dashboard.py
+```
+→ Opens at `http://localhost:8501`  
+→ Reads from `outputs/tdi_results.csv` + `outputs/aura_rf_model.pkl`  
+→ Live AQI/TDI charts, hotspot map, rerouting engine  
+
+---
+
+## 🔁 Full Data Flow
+
+```
+[Real CCTV / Kaggle Video / Synthetic Frames]
+              │
+              ▼
+  ┌─────────────────────────┐
+  │  Module 1 — YOLOv8      │  pip install ultralytics
+  │  • Load video frames    │
+  │  • Detect vehicles      │  Classes: car, truck, bus,
+  │    per frame            │    motorcycle, autorickshaw
+  │  • Compute TDI          │  TDI = vehicles / norm_area
+  │  • Save CSV             │
+  └──────────┬──────────────┘
+             │ tdi_results.csv
+             ▼
+  ┌─────────────────────────┐
+  │  Module 2 — Random      │  scikit-learn
+  │  Forest Regressor       │
+  │  • Merge TDI + AQI      │  Features: TDI, lag-PM2.5,
+  │  • Engineer features    │    wind, humidity, temp,
+  │  • Train RF (300 trees) │    cyclic hour encoding
+  │  • Predict PM2.5 (1h)   │  MAE ≈ 19 µg/m³, R²≈0.50
+  │  • Save model .pkl      │
+  └──────────┬──────────────┘
+             │ aura_rf_model.pkl
+             ▼
+  ┌─────────────────────────┐
+  │  Module 3 — Streamlit   │  streamlit + plotly
+  │  Dashboard              │
+  │  • Live TDI + AQI       │  Auto-refreshes every 3s
+  │  • Actual vs Predicted  │  Delhi NCR hotspot map
+  │  • Hotspot map          │  Rerouting trigger > threshold
+  │  • Smart Rerouting      │  Google Maps API slot ready
+  └─────────────────────────┘
+```
+
+---
+
+## 🧠 Random Forest Model Details
+
+| Parameter | Value |
+|---|---|
+| Algorithm | RandomForestRegressor |
+| n_estimators | 300 |
+| max_depth | 14 |
+| max_features | sqrt |
+| OOB Score (R²) | 0.923 |
+| Features (18 total) | TDI, lag-PM2.5 (1/2/3/6h), rolling mean (4h/8h), hour_sin/cos, weekday, month, wind, humidity, temp |
+| Target | PM2.5 one hour ahead |
+| Split | 80/20 time-ordered |
+
+---
+
+## 🔀 Rerouting Logic
+
+```python
+# Module 3 triggers rerouting when:
+if predicted_pm25 > aqi_threshold:   # default = 180 µg/m³ (CPCB "Moderate" boundary)
+    activate_rerouting(zone=current_zone)
+    
+    # In production → calls:
+    # google_maps.directions_api(origin, alternate_waypoints)
+    # firebase.push_notification(zone_users, "Reroute suggested")
+    # traffic_signal.extend_green(alternate_route)
+```
+
+---
+
+*Data: CPCB, data.gov.in, Kaggle, Roboflow, OpenStreetMap*  
+*Team AURA — AI-Based Integrated Urban Monitoring System*

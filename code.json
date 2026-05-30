@@ -1,0 +1,30 @@
+{
+  "mae": 11.94,
+  "rmse": 15.46,
+  "r2": 0.3687,
+  "oob": 0.7377,
+  "features": [
+    "PM2.5",
+    "PM10",
+    "NO",
+    "NO2",
+    "NOx",
+    "CO",
+    "SO2",
+    "O3",
+    "NH3",
+    "month",
+    "dayofweek",
+    "year",
+    "is_weekend",
+    "quarter",
+    "pm25_lag1",
+    "pm25_lag2",
+    "pm25_lag3",
+    "pm25_lag7",
+    "aqi_lag1",
+    "pm25_roll7",
+    "pm25_roll14",
+    "no2_roll7"
+  ]
+}
